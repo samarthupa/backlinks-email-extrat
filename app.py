@@ -85,8 +85,19 @@ def find_emails(url):
                     except:
                         pass
 
-    except Exception as e:
-        st.write(f"Error fetching {url}: {e}")
+    except requests.RequestException:
+        # Attempt to fetch the page from Google Cache if the URL fails to connect
+        cache_url = f"https://webcache.googleusercontent.com/search?q=cache:{url}"
+        try:
+            cache_response = requests.get(cache_url, timeout=5)
+            cache_soup = BeautifulSoup(cache_response.text, 'html.parser')
+
+            # Search for emails in the cached page
+            for mail in re.findall(r"[a-zA-Z0-9._%+-]+@[a-zA-Z0-9.-]+\.[a-zA-Z]{2,4}", cache_soup.prettify()):
+                if is_valid_email(mail, url):
+                    emails.add(mail)
+        except:
+            pass
 
     return list(emails)
 
