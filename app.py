@@ -3,6 +3,7 @@ import requests
 from bs4 import BeautifulSoup
 import re
 import csv
+from urllib.parse import urlparse
 
 # List of domains to exclude from email scraping
 EXCLUDE_DOMAINS = {
@@ -15,57 +16,49 @@ EXCLUDE_DOMAINS = {
     "www.geeksforgeeks.org",
     "www.shiksha.com",
     "google.com",
-    "pwskills.com"
+    "pwskills.com",
     "www.indeed.com",
     "www.scaler.com",
     "www.datacamp.com"
 }
 
-# Function to check if URL contains "google"
-def is_google_url(url):
-    return "google" in url
+# Function to check if a URL should be excluded
+def should_exclude(url):
+    parsed_url = urlparse(url)
+    domain = parsed_url.netloc
+    return any(excluded_domain in domain for excluded_domain in EXCLUDE_DOMAINS) or "google" in domain
 
 # Function to find emails in a webpage
 def find_emails(url):
     emails = set()
     try:
         response = requests.get(url, timeout=5)
-        if response.status_code == 200:
-            soup = BeautifulSoup(response.text, 'html.parser')
-            # Search for emails in the rendered HTML content
-            for mail in re.findall(r"[a-zA-Z0-9._%+-]+@[a-zA-Z0-9.-]+\.[a-zA-Z]{2,4}", soup.prettify()):
+        soup = BeautifulSoup(response.text, 'html.parser')
+
+        # Search for emails in the rendered HTML content
+        for mail in re.findall(r"[a-zA-Z0-9._%+-]+@[a-zA-Z0-9.-]+\.[a-zA-Z]{2,4}", soup.prettify()):
+            emails.add(mail)
+
+        # Check footer for emails
+        footer = soup.find('footer')
+        if footer:
+            for mail in re.findall(r"[a-zA-Z0-9._%+-]+@[a-zA-Z0-9.-]+\.[a-zA-Z]{2,4}", footer.prettify()):
                 emails.add(mail)
 
-            # Check footer for emails
-            footer = soup.find('footer')
-            if footer:
-                for mail in re.findall(r"[a-zA-Z0-9._%+-]+@[a-zA-Z0-9.-]+\.[a-zA-Z]{2,4}", footer.prettify()):
-                    emails.add(mail)
+        # Search for "Contact", "Connect", "About" links and check those pages for emails
+        for link in soup.find_all('a', href=True):
+            if any(keyword in link.text.lower() for keyword in ['contact', 'connect', 'about']):
+                linked_url = requests.compat.urljoin(url, link['href'])
+                try:
+                    linked_response = requests.get(linked_url, timeout=5)
+                    linked_soup = BeautifulSoup(linked_response.text, 'html.parser')
+                    for mail in re.findall(r"[a-zA-Z0-9._%+-]+@[a-zA-Z0-9.-]+\.[a-zA-Z]{2,4}", linked_soup.prettify()):
+                        emails.add(mail)
+                except:
+                    pass
 
-            # Search for "Contact", "Connect", "About" links and check those pages for emails
-            for link in soup.find_all('a', href=True):
-                if any(keyword in link.text.lower() for keyword in ['contact', 'connect', 'about']):
-                    linked_url = requests.compat.urljoin(url, link['href'])
-                    try:
-                        linked_response = requests.get(linked_url, timeout=5)
-                        linked_soup = BeautifulSoup(linked_response.text, 'html.parser')
-                        for mail in re.findall(r"[a-zA-Z0-9._%+-]+@[a-zA-Z0-9.-]+\.[a-zA-Z]{2,4}", linked_soup.prettify()):
-                            emails.add(mail)
-                    except:
-                        pass
-
-    except requests.RequestException as e:
+    except Exception as e:
         st.write(f"Error fetching {url}: {e}")
-        # Attempt to find webcache version
-        webcache_url = f"https://webcache.googleusercontent.com/search?q=cache:{url}"
-        try:
-            webcache_response = requests.get(webcache_url, timeout=5)
-            if webcache_response.status_code == 200:
-                soup = BeautifulSoup(webcache_response.text, 'html.parser')
-                for mail in re.findall(r"[a-zA-Z0-9._%+-]+@[a-zA-Z0-9.-]+\.[a-zA-Z]{2,4}", soup.prettify()):
-                    emails.add(mail)
-        except requests.RequestException as e:
-            st.write(f"Error fetching webcache for {url}: {e}")
 
     return list(emails)
 
@@ -96,7 +89,7 @@ def direct_google_search(query, num_results, country):
         href = link['href']
         if "url?q=" in href and "webcache" not in href:
             url = href.split("?q=")[1].split("&sa=U")[0]
-            if not any(excluded_domain in url for excluded_domain in EXCLUDE_DOMAINS) and not is_google_url(url):
+            if not should_exclude(url):
                 urls.append(url)
 
     return urls[:num_results]
