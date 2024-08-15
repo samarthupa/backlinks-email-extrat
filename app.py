@@ -36,7 +36,7 @@ def is_valid_email(email, url):
     # Basic email validation regex
     valid_email_pattern = r'^[a-zA-Z0-9._%+-]+@[a-zA-Z0-9.-]+\.[a-zA-Z]{2,}$'
     # Exclude emails that look like image filenames or have non-standard patterns
-    invalid_patterns = [r'\.png$', r'\.jpg$', r'\.jpeg$', r'\.gif$', r'\.webp$', r'^jhsuysyuuwnoi@jksbhs\.js$', r'\.svg$']
+    invalid_patterns = [r'\.png$', r'\.jpg$', r'\.jpeg$', r'\.gif$', r'\.webp$', r'\.svg$']
 
     if re.match(valid_email_pattern, email):
         for pattern in invalid_patterns:
