@@ -1,8 +1,22 @@
 import streamlit as st
 import requests
 from bs4 import BeautifulSoup
-import csv
 import re
+import csv
+
+# List of domains to exclude from email scraping
+EXCLUDE_DOMAINS = {
+    "www.classcentral.com",
+    "www.youtube.com",
+    "www.simplilearn.com",
+    "www.udemy.com",
+    "www.coursera.org",
+    "www.linkedin.com",
+    "www.geeksforgeeks.org",
+    "www.shiksha.com",
+    "google.com",
+    "pwskills.com"
+}
 
 # Function to find emails in a webpage
 def find_emails(url):
@@ -11,14 +25,14 @@ def find_emails(url):
         response = requests.get(url, timeout=5)
         soup = BeautifulSoup(response.text, 'html.parser')
 
-        # Search for emails in the page content
-        for mail in re.findall(r"[a-zA-Z0-9._%+-]+@[a-zA-Z0-9.-]+\.[a-zA-Z]{2,4}", soup.text):
+        # Search for emails in the rendered HTML content
+        for mail in re.findall(r"[a-zA-Z0-9._%+-]+@[a-zA-Z0-9.-]+\.[a-zA-Z]{2,4}", soup.prettify()):
             emails.add(mail)
 
         # Check footer for emails
         footer = soup.find('footer')
         if footer:
-            for mail in re.findall(r"[a-zA-Z0-9._%+-]+@[a-zA-Z0-9.-]+\.[a-zA-Z]{2,4}", footer.text):
+            for mail in re.findall(r"[a-zA-Z0-9._%+-]+@[a-zA-Z0-9.-]+\.[a-zA-Z]{2,4}", footer.prettify()):
                 emails.add(mail)
 
         # Search for "Contact", "Connect", "About" links and check those pages for emails
@@ -28,7 +42,7 @@ def find_emails(url):
                 try:
                     linked_response = requests.get(linked_url, timeout=5)
                     linked_soup = BeautifulSoup(linked_response.text, 'html.parser')
-                    for mail in re.findall(r"[a-zA-Z0-9._%+-]+@[a-zA-Z0-9.-]+\.[a-zA-Z]{2,4}", linked_soup.text):
+                    for mail in re.findall(r"[a-zA-Z0-9._%+-]+@[a-zA-Z0-9.-]+\.[a-zA-Z]{2,4}", linked_soup.prettify()):
                         emails.add(mail)
                 except:
                     pass
@@ -39,8 +53,23 @@ def find_emails(url):
     return list(emails)
 
 # Function to perform a direct Google search and scrape URLs
-def direct_google_search(query, num_results):
-    search_url = f"https://www.google.com/search?q={query}&num={num_results}"
+def direct_google_search(query, num_results, country):
+    google_domains = {
+        "global": "www.google.com",
+        "us": "www.google.com",
+        "uk": "www.google.co.uk",
+        "ca": "www.google.ca",
+        "au": "www.google.com.au",
+        "in": "www.google.co.in",
+        "de": "www.google.de",
+        "fr": "www.google.fr",
+        "jp": "www.google.co.jp",
+        "br": "www.google.com.br",
+        "za": "www.google.co.za"
+    }
+
+    domain = google_domains.get(country, "www.google.com")
+    search_url = f"https://{domain}/search?q={query}&num={num_results}"
     headers = {"User-Agent": "Mozilla/5.0"}
     response = requests.get(search_url, headers=headers)
     soup = BeautifulSoup(response.text, 'html.parser')
@@ -50,7 +79,8 @@ def direct_google_search(query, num_results):
         href = link['href']
         if "url?q=" in href and "webcache" not in href:
             url = href.split("?q=")[1].split("&sa=U")[0]
-            urls.append(url)
+            if not any(excluded_domain in url for excluded_domain in EXCLUDE_DOMAINS):
+                urls.append(url)
 
     return urls[:num_results]
 
@@ -61,11 +91,12 @@ def main():
 
     keyword = st.text_input("Enter a keyword to search:")
     num_results = st.slider("Number of results to scrape (max 200):", 1, 200, 50)
+    country = st.selectbox("Select Country:", ["global", "us", "uk", "ca", "au", "in", "de", "fr", "jp", "br", "za"])
 
     if st.button("Start Scraping"):
         if keyword:
             with st.spinner("Scraping Google search results..."):
-                urls = direct_google_search(keyword, num_results)
+                urls = direct_google_search(keyword, num_results, country)
                 st.write(f"Found {len(urls)} URLs.")
 
                 results = []
@@ -103,3 +134,4 @@ def convert_to_csv(data):
 
 if __name__ == "__main__":
     main()
+
