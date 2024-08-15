@@ -22,6 +22,9 @@ EXCLUDE_DOMAINS = {
     "www.datacamp.com"
 }
 
+# List of domains where specific email filtering is required
+SPECIFIC_DOMAINS = ["medium.com", "reddit.com", "quora.com"]
+
 # Function to check if a URL should be excluded
 def should_exclude(url):
     parsed_url = urlparse(url)
@@ -29,8 +32,8 @@ def should_exclude(url):
     path = parsed_url.path
     return any(excluded_domain in domain for excluded_domain in EXCLUDE_DOMAINS) or "google" in domain or path.startswith("/search")
 
-# Function to validate emails
-def is_valid_email(email):
+# Function to validate emails with additional domain-specific filtering
+def is_valid_email(email, url):
     # Basic email validation regex
     valid_email_pattern = r'^[a-zA-Z0-9._%+-]+@[a-zA-Z0-9.-]+\.[a-zA-Z]{2,}$'
     # Exclude emails that look like image filenames or have non-standard patterns
@@ -40,6 +43,13 @@ def is_valid_email(email):
         for pattern in invalid_patterns:
             if re.search(pattern, email):
                 return False
+        
+        # Specific domain filtering logic
+        parsed_url = urlparse(url)
+        for specific_domain in SPECIFIC_DOMAINS:
+            if specific_domain in parsed_url.netloc:
+                if email.endswith(f"@{specific_domain}"):
+                    return False
         return True
     return False
 
@@ -52,14 +62,14 @@ def find_emails(url):
 
         # Search for emails in the rendered HTML content
         for mail in re.findall(r"[a-zA-Z0-9._%+-]+@[a-zA-Z0-9.-]+\.[a-zA-Z]{2,4}", soup.prettify()):
-            if is_valid_email(mail):
+            if is_valid_email(mail, url):
                 emails.add(mail)
 
         # Check footer for emails
         footer = soup.find('footer')
         if footer:
             for mail in re.findall(r"[a-zA-Z0-9._%+-]+@[a-zA-Z0-9.-]+\.[a-zA-Z]{2,4}", footer.prettify()):
-                if is_valid_email(mail):
+                if is_valid_email(mail, url):
                     emails.add(mail)
 
         # Search for "Contact", "Connect", "About" links and check those pages for emails
@@ -71,7 +81,7 @@ def find_emails(url):
                         linked_response = requests.get(linked_url, timeout=5)
                         linked_soup = BeautifulSoup(linked_response.text, 'html.parser')
                         for mail in re.findall(r"[a-zA-Z0-9._%+-]+@[a-zA-Z0-9.-]+\.[a-zA-Z]{2,4}", linked_soup.prettify()):
-                            if is_valid_email(mail):
+                            if is_valid_email(mail, linked_url):
                                 emails.add(mail)
                     except:
                         pass
