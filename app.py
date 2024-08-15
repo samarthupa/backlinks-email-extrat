@@ -3,7 +3,6 @@ import requests
 from bs4 import BeautifulSoup
 import csv
 import re
-from serpapi import GoogleSearch
 
 # Function to find emails in a webpage
 def find_emails(url):
@@ -55,53 +54,52 @@ def direct_google_search(query, num_results):
 
     return urls[:num_results]
 
-# Streamlit UI
-st.title("Email Scraper Tool")
+# Main function to handle search and email scraping
+def main():
+    st.title("Google Search Email Scraper")
+    st.write("Enter a keyword to search for, and the app will scrape Google for the top URLs and extract emails from those websites.")
 
-keyword = st.text_input("Enter a keyword to search:")
-num_results = st.slider("Number of results to scrape (max 200):", 1, 200, 50)
+    keyword = st.text_input("Enter a keyword to search:")
+    num_results = st.slider("Number of results to scrape (max 200):", 1, 200, 50)
 
-if st.button("Search and Scrape Emails"):
-    if keyword:
-        st.write(f"Searching Google for '{keyword}'...")
+    if st.button("Start Scraping"):
+        if keyword:
+            with st.spinner("Scraping Google search results..."):
+                urls = direct_google_search(keyword, num_results)
+                st.write(f"Found {len(urls)} URLs.")
 
-        # Use SerpApi first
-        try:
-            params = {
-                "engine": "google",
-                "q": keyword,
-                "num": num_results,
-                "api_key": "YOUR_SERPAPI_KEY"
-            }
+                results = []
+                for url in urls:
+                    st.write(f"Scraping emails from {url}...")
+                    emails = find_emails(url)
+                    if emails:
+                        results.append([url] + emails)
+                    else:
+                        results.append([url, "No emails found"])
 
-            search = GoogleSearch(params)
-            results = search.get_dict()
-            urls = [result['link'] for result in results['organic_results']]
+                # Display results in a table
+                st.write("Scraping completed! Results:")
+                st.table(results)
 
-        except Exception as e:
-            st.warning(f"SerpApi failed: {e}. Switching to direct Google search.")
-            urls = direct_google_search(keyword, num_results)
+                # Download results as CSV
+                csv_data = convert_to_csv(results)
+                st.download_button(
+                    label="Download results as CSV",
+                    data=csv_data,
+                    file_name='scraped_emails.csv',
+                    mime='text/csv',
+                )
+        else:
+            st.warning("Please enter a keyword to search.")
 
-        st.write(f"Found {len(urls)} URLs.")
+# Helper function to convert results to CSV format
+def convert_to_csv(data):
+    output = []
+    header = ["URL", "Email 1", "Email 2", "Email 3", "..."]
+    output.append(",".join(header) + "\n")
+    for row in data:
+        output.append(",".join(row) + "\n")
+    return "".join(output)
 
-        results = []
-        for url in urls:
-            st.write(f"Scraping emails from {url}...")
-            emails = find_emails(url)
-            if emails:
-                results.append([url] + emails)
-            else:
-                results.append([url, "No emails found"])
-
-        # Output results to CSV
-        st.write("Scraping completed. Preparing CSV file...")
-        with open('scraped_emails.csv', 'w', newline='', encoding='utf-8') as csvfile:
-            writer = csv.writer(csvfile)
-            writer.writerow(["URL", "Email 1", "Email 2", "Email 3", "..."])
-            writer.writerows(results)
-
-        st.success("Scraping completed! Download the results:")
-        st.download_button(label="Download CSV", data=open('scraped_emails.csv', 'rb').read(), file_name="scraped_emails.csv", mime="text/csv")
-
-    else:
-        st.warning("Please enter a keyword to search.")
+if __name__ == "__main__":
+    main()
