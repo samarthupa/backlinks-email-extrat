@@ -91,23 +91,8 @@ def find_emails(url):
     return list(emails)
 
 # Function to perform a direct Google search and scrape URLs
-def direct_google_search(query, num_results, country):
-    google_domains = {
-        "global": "www.google.com",
-        "us": "www.google.com",
-        "uk": "www.google.co.uk",
-        "ca": "www.google.ca",
-        "au": "www.google.com.au",
-        "in": "www.google.co.in",
-        "de": "www.google.de",
-        "fr": "www.google.fr",
-        "jp": "www.google.co.jp",
-        "br": "www.google.com.br",
-        "za": "www.google.co.za"
-    }
-
-    domain = google_domains.get(country, "www.google.com")
-    search_url = f"https://{domain}/search?q={query}&num={num_results}"
+def direct_google_search(query, num_results):
+    search_url = f"https://www.google.com/search?q={query}&num={num_results}"
     headers = {"User-Agent": "Mozilla/5.0"}
     response = requests.get(search_url, headers=headers)
     soup = BeautifulSoup(response.text, 'html.parser')
@@ -127,16 +112,16 @@ def main():
     st.title("Google Search Email Scraper")
     st.write("Enter a keyword to search for, or provide a list of URLs. The app will scrape Google for the top URLs or use the provided URLs and extract emails from those websites.")
 
+    # Reordering the input fields
     keyword = st.text_input("Enter a keyword to search (optional if URLs are provided):")
     num_results = st.slider("Number of results to scrape (max 200):", 1, 200, 50)
-    country = st.selectbox("Select Country:", ["global", "us", "uk", "ca", "au", "in", "de", "fr", "jp", "br", "za"])
     urls_input = st.text_area("Enter URLs (one per line, optional):")
 
     urls_provided = [url.strip() for url in urls_input.split("\n") if url.strip()]
 
     if st.button("Start Scraping"):
         if urls_provided or keyword:
-            urls = urls_provided if urls_provided else direct_google_search(keyword, num_results, country)
+            urls = urls_provided if urls_provided else direct_google_search(keyword, num_results)
             st.write(f"Found {len(urls)} URLs.")
 
             results = []
