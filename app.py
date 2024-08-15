@@ -64,20 +64,13 @@ def find_emails(url):
             if is_valid_email(mail, url):
                 emails.add(mail)
 
-        # Check footer for emails
-        footer = soup.find('footer')
-        if footer:
-            for mail in re.findall(r"[a-zA-Z0-9._%+-]+@[a-zA-Z0-9.-]+\.[a-zA-Z]{2,4}", footer.prettify()):
-                if is_valid_email(mail, url):
-                    emails.add(mail)
-
-        # Search for "Contact", "Connect", "About" links and check those pages for emails
+        # Check "Contact", "Connect", "About" links and check those pages for emails
         for link in soup.find_all('a', href=True):
             if any(keyword in link.text.lower() for keyword in ['contact', 'connect', 'about']):
                 linked_url = urljoin(url, link['href'])
                 if not should_exclude(linked_url):  # Prevent circular references and scraping excluded domains
                     try:
-                        linked_response = requests.get(linked_url, timeout=10)
+                        linked_response = requests.get(linked_url, timeout=5)
                         linked_soup = BeautifulSoup(linked_response.text, 'html.parser')
                         for mail in re.findall(r"[a-zA-Z0-9._%+-]+@[a-zA-Z0-9.-]+\.[a-zA-Z]{2,4}", linked_soup.prettify()):
                             if is_valid_email(mail, linked_url):
