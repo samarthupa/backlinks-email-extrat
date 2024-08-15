@@ -128,9 +128,9 @@ def main():
     st.write("Enter a keyword to search for, or provide a list of URLs. The app will scrape Google for the top URLs or use the provided URLs and extract emails from those websites.")
 
     keyword = st.text_input("Enter a keyword to search (optional if URLs are provided):")
-    urls_input = st.text_area("Enter URLs (one per line, optional):")
     num_results = st.slider("Number of results to scrape (max 200):", 1, 200, 50)
     country = st.selectbox("Select Country:", ["global", "us", "uk", "ca", "au", "in", "de", "fr", "jp", "br", "za"])
+    urls_input = st.text_area("Enter URLs (one per line, optional):")
 
     urls_provided = [url.strip() for url in urls_input.split("\n") if url.strip()]
 
