@@ -36,7 +36,7 @@ def is_valid_email(email, url):
     # Basic email validation regex
     valid_email_pattern = r'^[a-zA-Z0-9._%+-]+@[a-zA-Z0-9.-]+\.[a-zA-Z]{2,}$'
     # Exclude emails that look like image filenames or have non-standard patterns
-    invalid_patterns = [r'\.png$', r'\.jpg$', r'\.jpeg$', r'\.gif$', r'\.webp$', r'\.svg$']
+    invalid_patterns = [r'\.png$', r'\.jpg$', r'\.jpeg$', r'\.gif$', r'\.webp$', r'^jhsuysyuuwnoi@jksbhs\.js$', r'\.svg$']
 
     if re.match(valid_email_pattern, email):
         for pattern in invalid_patterns:
@@ -58,6 +58,13 @@ def find_emails(url):
     try:
         response = requests.get(url, timeout=5)
         soup = BeautifulSoup(response.text, 'html.parser')
+
+        # Search for emails in `mailto:` links
+        for mailto in soup.find_all('a', href=True):
+            if 'mailto:' in mailto['href']:
+                email = mailto['href'].split('mailto:')[1]
+                if is_valid_email(email, url):
+                    emails.add(email)
 
         # Search for emails in the rendered HTML content
         for mail in re.findall(r"[a-zA-Z0-9._%+-]+@[a-zA-Z0-9.-]+\.[a-zA-Z]{2,4}", soup.prettify()):
