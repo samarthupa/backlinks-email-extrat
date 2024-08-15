@@ -3,7 +3,7 @@ import requests
 from bs4 import BeautifulSoup
 import re
 import csv
-from urllib.parse import urlparse
+from urllib.parse import urlparse, urljoin
 
 # List of domains to exclude from email scraping
 EXCLUDE_DOMAINS = {
@@ -26,7 +26,22 @@ EXCLUDE_DOMAINS = {
 def should_exclude(url):
     parsed_url = urlparse(url)
     domain = parsed_url.netloc
-    return any(excluded_domain in domain for excluded_domain in EXCLUDE_DOMAINS) or "google" in domain
+    path = parsed_url.path
+    return any(excluded_domain in domain for excluded_domain in EXCLUDE_DOMAINS) or "google" in domain or path.startswith("/search")
+
+# Function to validate emails
+def is_valid_email(email):
+    # Basic email validation regex
+    valid_email_pattern = r'^[a-zA-Z0-9._%+-]+@[a-zA-Z0-9.-]+\.[a-zA-Z]{2,}$'
+    # Exclude emails that look like image filenames or have non-standard patterns
+    invalid_patterns = [r'\.png$', r'\.jpg$', r'\.jpeg$', r'\.gif$', r'\.webp$', r'^jhsuysyuuwnoi@jksbhs\.js$', r'\.svg$']
+
+    if re.match(valid_email_pattern, email):
+        for pattern in invalid_patterns:
+            if re.search(pattern, email):
+                return False
+        return True
+    return False
 
 # Function to find emails in a webpage
 def find_emails(url):
@@ -37,25 +52,29 @@ def find_emails(url):
 
         # Search for emails in the rendered HTML content
         for mail in re.findall(r"[a-zA-Z0-9._%+-]+@[a-zA-Z0-9.-]+\.[a-zA-Z]{2,4}", soup.prettify()):
-            emails.add(mail)
+            if is_valid_email(mail):
+                emails.add(mail)
 
         # Check footer for emails
         footer = soup.find('footer')
         if footer:
             for mail in re.findall(r"[a-zA-Z0-9._%+-]+@[a-zA-Z0-9.-]+\.[a-zA-Z]{2,4}", footer.prettify()):
-                emails.add(mail)
+                if is_valid_email(mail):
+                    emails.add(mail)
 
         # Search for "Contact", "Connect", "About" links and check those pages for emails
         for link in soup.find_all('a', href=True):
             if any(keyword in link.text.lower() for keyword in ['contact', 'connect', 'about']):
-                linked_url = requests.compat.urljoin(url, link['href'])
-                try:
-                    linked_response = requests.get(linked_url, timeout=5)
-                    linked_soup = BeautifulSoup(linked_response.text, 'html.parser')
-                    for mail in re.findall(r"[a-zA-Z0-9._%+-]+@[a-zA-Z0-9.-]+\.[a-zA-Z]{2,4}", linked_soup.prettify()):
-                        emails.add(mail)
-                except:
-                    pass
+                linked_url = urljoin(url, link['href'])
+                if not should_exclude(linked_url):  # Prevent circular references and scraping excluded domains
+                    try:
+                        linked_response = requests.get(linked_url, timeout=5)
+                        linked_soup = BeautifulSoup(linked_response.text, 'html.parser')
+                        for mail in re.findall(r"[a-zA-Z0-9._%+-]+@[a-zA-Z0-9.-]+\.[a-zA-Z]{2,4}", linked_soup.prettify()):
+                            if is_valid_email(mail):
+                                emails.add(mail)
+                    except:
+                        pass
 
     except Exception as e:
         st.write(f"Error fetching {url}: {e}")
