@@ -2,7 +2,6 @@ import streamlit as st
 import requests
 from bs4 import BeautifulSoup
 import re
-import csv
 from urllib.parse import urlparse, urljoin
 
 # List of domains to exclude from email scraping
@@ -142,23 +141,24 @@ def main():
                 for url in urls:
                     st.write(f"Scraping emails from {url}...")
                     emails = find_emails(url)
-                    if emails:
+                    if emails:  # Only add URLs with found emails to the results
                         results.append([url] + emails)
-                    else:
-                        results.append([url, "No emails found"])
 
                 # Display results in a table
                 st.write("Scraping completed! Results:")
                 st.table(results)
 
                 # Download results as CSV
-                csv_data = convert_to_csv(results)
-                st.download_button(
-                    label="Download results as CSV",
-                    data=csv_data,
-                    file_name='scraped_emails.csv',
-                    mime='text/csv',
-                )
+                if results:  # Only enable download if there are results with emails
+                    csv_data = convert_to_csv(results)
+                    st.download_button(
+                        label="Download results as CSV",
+                        data=csv_data,
+                        file_name='scraped_emails.csv',
+                        mime='text/csv',
+                    )
+                else:
+                    st.write("No valid emails found in the search results.")
         else:
             st.warning("Please enter a keyword to search.")
 
